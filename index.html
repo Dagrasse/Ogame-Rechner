@@ -1,0 +1,487 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>OGame Sparrechner</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Saira+Condensed:wght@500;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: Kommandopult – links eigene Werte (Eingaben), rechts Auswertung in drei Reitern */
+:root{
+  --bg:#eaeef4; --panel:#f8fafc; --line:#cdd5e1; --fg:#18202e; --muted:#5a667a;
+  --accent:#b8650a; --accent-soft:#f6e3c8;
+  --metal:#5f6f86; --crystal:#2a74c4; --deut:#168a78;
+  --good:#1d7f4a; --warn:#b3261e;
+  --f-display:"Saira Condensed","Arial Narrow",system-ui,sans-serif;
+  --f-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0d1220; --panel:#151c2e; --line:#2a3550; --fg:#e4e9f3; --muted:#93a0b8;
+  --accent:#f0a43a; --accent-soft:#3a2a12;
+  --metal:#a3b2c9; --crystal:#5aa8ff; --deut:#3fd0b4;
+  --good:#5bd08c; --warn:#ff8a80; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0d1220; --panel:#151c2e; --line:#2a3550; --fg:#e4e9f3; --muted:#93a0b8;
+  --accent:#f0a43a; --accent-soft:#3a2a12;
+  --metal:#a3b2c9; --crystal:#5aa8ff; --deut:#3fd0b4;
+  --good:#5bd08c; --warn:#ff8a80; color-scheme:dark}
+
+body{background:var(--bg);color:var(--fg);font-family:var(--f-body);font-size:14px;line-height:1.45}
+.wrap{max-width:1180px;margin:0 auto;padding-block:20px 48px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+header{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 16px;margin-bottom:18px}
+h1{font-family:var(--f-display);font-weight:700;font-size:2.1rem;letter-spacing:.02em;margin:0;text-transform:uppercase}
+h1 span{color:var(--accent)}
+header p{margin:0;color:var(--muted);max-width:60ch}
+.grid{display:grid;grid-template-columns:minmax(0,380px) minmax(0,1fr);gap:18px;align-items:start}
+@media (max-width:860px){.grid{grid-template-columns:minmax(0,1fr)}}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:14px 16px}
+.stack{display:flex;flex-direction:column;gap:14px;min-width:0}
+h2{font-family:var(--f-display);font-weight:700;font-size:1.05rem;text-transform:uppercase;letter-spacing:.08em;margin:0 0 10px;color:var(--fg)}
+h2 small{font-family:var(--f-body);font-weight:400;text-transform:none;letter-spacing:0;color:var(--muted);font-size:.8rem;margin-left:6px}
+.res3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.field{display:flex;flex-direction:column;gap:3px;min-width:0}
+.field label,.lbl{font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:600}
+.lbl-M{color:var(--metal)}.lbl-K{color:var(--crystal)}.lbl-D{color:var(--deut)}
+input[type=text],input[type=number],select{width:100%;box-sizing:border-box;font:500 .95rem var(--f-mono);color:var(--fg);
+  background:var(--bg);border:1px solid var(--line);border-radius:4px;padding:6px 8px;font-variant-numeric:tabular-nums}
+select{font-family:var(--f-body)}
+input:focus-visible,select:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:end}
+.row>.field{flex:1 1 90px}
+.sub{margin-top:12px;padding-top:12px;border-top:1px dashed var(--line)}
+.hint{font-size:.78rem;color:var(--muted);margin:6px 0 0}
+.check{display:flex;gap:8px;align-items:center;font-size:.9rem;margin-top:10px}
+.check input{accent-color:var(--accent);width:16px;height:16px}
+
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);overflow-x:auto}
+.tabs button{font:700 .95rem var(--f-display);text-transform:uppercase;letter-spacing:.06em;color:var(--muted);background:none;border:0;
+  border-bottom:3px solid transparent;padding:10px 12px 8px;cursor:pointer;white-space:nowrap}
+.tabs button[aria-selected=true]{color:var(--fg);border-bottom-color:var(--accent)}
+.tabs button:hover{color:var(--fg)}
+.tabpanel{padding-top:16px}
+
+.headline{display:flex;flex-wrap:wrap;gap:4px 18px;align-items:baseline;margin-bottom:14px}
+.big{font-family:var(--f-display);font-weight:700;font-size:2.4rem;line-height:1;color:var(--accent)}
+.headline .meta{color:var(--muted)}
+.pill{display:inline-block;font-size:.72rem;font-weight:600;text-transform:uppercase;letter-spacing:.05em;padding:2px 8px;border-radius:99px;
+  background:var(--accent-soft);color:var(--accent)}
+.pill.ok{background:transparent;border:1px solid var(--good);color:var(--good)}
+
+.tblwrap{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums}
+th,td{text-align:right;padding:8px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+th{font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:600}
+th:first-child,td:first-child{text-align:left}
+td{font-family:var(--f-mono);font-size:.9rem}
+td.name{font-family:var(--f-body);font-weight:600}
+tr.bott td{background:var(--accent-soft)}
+.bar{height:6px;border-radius:3px;background:var(--line);overflow:hidden;margin-top:5px;min-width:80px}
+.bar i{display:block;height:100%}
+.c-M{background:var(--metal)}.c-K{background:var(--crystal)}.c-D{background:var(--deut)}
+.t-M{color:var(--metal)}.t-K{color:var(--crystal)}.t-D{color:var(--deut)}
+.cell-sub{display:block;font-size:.75rem;color:var(--muted);font-family:var(--f-body)}
+.win{color:var(--good);font-weight:600}
+.lose{color:var(--muted)}
+.note{margin-top:14px;padding:10px 12px;border-left:3px solid var(--accent);background:var(--bg);font-size:.88rem}
+.note p{margin:0 0 4px}.note p:last-child{margin:0}
+.presets{display:flex;flex-wrap:wrap;gap:6px}
+.presets button{font:500 .85rem var(--f-mono);background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:4px;padding:5px 10px;cursor:pointer}
+.presets button:hover{border-color:var(--accent)}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:4px;overflow:hidden}
+.seg button{font:500 .85rem var(--f-body);background:var(--bg);color:var(--muted);border:0;padding:6px 10px;cursor:pointer}
+.seg button[aria-pressed=true]{background:var(--accent);color:var(--panel)}
+.costline{display:flex;flex-wrap:wrap;gap:4px 16px;margin-top:10px;font-family:var(--f-mono);font-size:.9rem}
+.example{font-size:.78rem;color:var(--accent);margin-top:2px}
+.unitbar{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;margin-bottom:6px}
+.res4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+@media (max-width:400px){.res4{grid-template-columns:repeat(2,minmax(0,1fr))}}
+h3{font-family:var(--f-display);font-weight:700;font-size:1rem;text-transform:uppercase;letter-spacing:.08em;margin:22px 0 8px}
+tr.best td{background:var(--accent-soft)}
+.plans{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;margin-top:12px}
+.plan{border:1px solid var(--line);border-radius:6px;padding:10px 12px;background:var(--bg)}
+.plan.win-plan{border-color:var(--accent)}
+.plan .v{font-family:var(--f-display);font-weight:700;font-size:1.6rem;line-height:1.1}
+.plan p{margin:4px 0 0;font-size:.85rem;color:var(--muted)}
+.reset{font:500 .78rem var(--f-body);background:none;border:0;color:var(--muted);text-decoration:underline;cursor:pointer;padding:0}
+</style>
+
+<style>
+:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+body{margin:0}
+img{max-width:100%}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <h1>OGame <span>Sparrechner</span></h1>
+  <p>Forschungskosten gegen Produktion, Expeditionen und Ressourcenpakete rechnen. Standardmässig in Millionen: <code>1,5</code> heisst 1,5 Mio. Mit <code>k</code>, <code>m</code> oder <code>mrd</code> am Ende kannst du jederzeit eine andere Einheit nehmen.</p>
+</header>
+
+<div class="grid">
+  <!-- Eingaben -->
+  <div class="stack">
+    <section class="panel">
+      <div class="unitbar">
+        <span class="lbl">Rohstoffe eingeben in</span>
+        <div class="seg" id="unitSeg"><button type="button" data-v="mio" aria-pressed="true">Millionen</button><button type="button" data-v="k" aria-pressed="false">Tausend</button><button type="button" data-v="exact" aria-pressed="false">Genau</button></div>
+      </div>
+      <p class="hint" id="unitHint" style="margin:0 0 12px"></p>
+      <h2>Produktion <small>pro Stunde, alle Planeten</small></h2>
+      <div class="res3">
+        <div class="field"><label class="lbl-M" for="pM">Metall</label><input id="pM" type="text" inputmode="decimal" value="1,2"></div>
+        <div class="field"><label class="lbl-K" for="pK">Kristall</label><input id="pK" type="text" inputmode="decimal" value="0,6"></div>
+        <div class="field"><label class="lbl-D" for="pD">Deuterium</label><input id="pD" type="text" inputmode="decimal" value="0,3"></div>
+      </div>
+      <div class="sub">
+        <h2>Expeditionen <small>Ø Ertrag pro Monat</small></h2>
+        <div class="res3">
+          <div class="field"><label class="lbl-M" for="eM">Metall</label><input id="eM" type="text" inputmode="decimal" value="3000"></div>
+          <div class="field"><label class="lbl-K" for="eK">Kristall</label><input id="eK" type="text" inputmode="decimal" value="1500"></div>
+          <div class="field"><label class="lbl-D" for="eD">Deuterium</label><input id="eD" type="text" inputmode="decimal" value="500"></div>
+        </div>
+        <p class="hint">Gesamtertrag aller Expos in einem Monat. Wird gleichmässig auf die Stunden verteilt (Ø 30,4 Tage = 730 h): <span id="expoInfo"></span></p>
+      </div>
+      <div class="sub">
+        <h2>Vorrat jetzt</h2>
+        <div class="res3">
+          <div class="field"><label class="lbl-M" for="sM">Metall</label><input id="sM" type="text" inputmode="decimal" value="20"></div>
+          <div class="field"><label class="lbl-K" for="sK">Kristall</label><input id="sK" type="text" inputmode="decimal" value="10"></div>
+          <div class="field"><label class="lbl-D" for="sD">Deuterium</label><input id="sD" type="text" inputmode="decimal" value="5"></div>
+        </div>
+      </div>
+      <div class="sub">
+        <h2>Ressourcenpakete</h2>
+        <div class="res3">
+          <div class="field"><label class="lbl-M" for="hM">Metall · Std.</label><input id="hM" type="text" inputmode="decimal" value="24"></div>
+          <div class="field"><label class="lbl-K" for="hK">Kristall · Std.</label><input id="hK" type="text" inputmode="decimal" value="24"></div>
+          <div class="field"><label class="lbl-D" for="hD">Deut · Std.</label><input id="hD" type="text" inputmode="decimal" value="24"></div>
+          <div class="field"><label class="lbl-M" for="cM">Anzahl</label><input id="cM" type="text" inputmode="decimal" value="3"></div>
+          <div class="field"><label class="lbl-K" for="cK">Anzahl</label><input id="cK" type="text" inputmode="decimal" value="2"></div>
+          <div class="field"><label class="lbl-D" for="cD">Anzahl</label><input id="cD" type="text" inputmode="decimal" value="0"></div>
+        </div>
+        <div class="row" style="margin-top:8px">
+          <div class="field"><label for="hA">Komplettpaket · Std.</label><input id="hA" type="text" inputmode="decimal" value="24"></div>
+          <div class="field"><label for="cA">Anzahl</label><input id="cA" type="text" inputmode="decimal" value="1"></div>
+        </div>
+        <h2 style="margin-top:12px">Preis in Dunkler Materie</h2>
+        <div class="res4">
+          <div class="field"><label class="lbl-M" for="dM">Metall</label><input id="dM" type="text" inputmode="decimal" value="48.000"></div>
+          <div class="field"><label class="lbl-K" for="dK">Kristall</label><input id="dK" type="text" inputmode="decimal" value="96.000"></div>
+          <div class="field"><label class="lbl-D" for="dD">Deut</label><input id="dD" type="text" inputmode="decimal" value="114.000"></div>
+          <div class="field"><label for="dA">Komplett</label><input id="dA" type="text" inputmode="decimal" value="" placeholder="?"></div>
+        </div>
+        <p class="hint">Ein Paket = so viele Stunden deiner Produktion. Ein Paket bringt: <span id="pkgInfo"></span>. Ein Komplettpaket bringt alle drei: <span id="pkgAInfo"></span></p>
+      </div>
+      <div class="sub">
+        <h2>Händler <small>Kurs Metall : Kristall : Deut</small></h2>
+        <div class="res3">
+          <div class="field"><label class="lbl-M" for="rM">Metall</label><input id="rM" type="text" inputmode="decimal" value="3"></div>
+          <div class="field"><label class="lbl-K" for="rK">Kristall</label><input id="rK" type="text" inputmode="decimal" value="2"></div>
+          <div class="field"><label class="lbl-D" for="rD">Deuterium</label><input id="rD" type="text" inputmode="decimal" value="1"></div>
+        </div>
+        <div class="res3" style="margin-top:8px">
+          <div class="field"><label for="tF">DM pro Händler</label><input id="tF" type="text" inputmode="decimal" value="3.500"></div>
+          <div class="field"><label for="tN">Aufrufe</label><input id="tN" type="text" inputmode="decimal" value="1"></div>
+          <div class="field"><label for="tL">Kursverlust %</label><input id="tL" type="text" inputmode="decimal" value="0"></div>
+        </div>
+        <p class="hint">Der Händler kostet pro Aufruf DM. Sein Kurs schwankt: Kursverlust = wie viel schlechter als der Kurs oben du rechnen willst, z.&nbsp;B. 10.</p>
+      </div>
+      <p class="example" id="exampleNote">Das sind Beispielwerte. Trag deine eigenen ein, sie werden in diesem Browser gespeichert.</p>
+      <button class="reset" id="resetBtn" type="button">Auf Beispielwerte zurücksetzen</button>
+    </section>
+  </div>
+
+  <!-- Auswertung -->
+  <div class="stack">
+    <section class="panel">
+      <h2>Forschung</h2>
+      <div class="row">
+        <div class="field" style="flex:3 1 220px"><label for="rs">Forschung</label><select id="rs"></select></div>
+        <div class="field"><label for="lv0">Aktuelle Stufe</label><input id="lv0" type="number" min="0" max="60" value="14"></div>
+        <div class="field"><label for="lv1">Zielstufe</label><input id="lv1" type="number" min="1" max="60" value="15"></div>
+      </div>
+      <div id="customBox" class="res3" style="margin-top:8px" hidden>
+        <div class="field"><label class="lbl-M" for="xM">Metall</label><input id="xM" type="text" inputmode="decimal" value="0"></div>
+        <div class="field"><label class="lbl-K" for="xK">Kristall</label><input id="xK" type="text" inputmode="decimal" value="0"></div>
+        <div class="field"><label class="lbl-D" for="xD">Deuterium</label><input id="xD" type="text" inputmode="decimal" value="0"></div>
+      </div>
+      <div class="costline" id="costLine"></div>
+    </section>
+
+    <section class="panel">
+      <div class="tabs" role="tablist">
+        <button role="tab" id="tab-save" aria-controls="p-save" aria-selected="true">Spardauer</button>
+        <button role="tab" id="tab-boost" aria-controls="p-boost" aria-selected="false">Booster vs. Paket</button>
+        <button role="tab" id="tab-pkg" aria-controls="p-pkg" aria-selected="false">Pakete für Forschung</button>
+      </div>
+
+      <!-- Tab 1 -->
+      <div class="tabpanel" id="p-save" role="tabpanel">
+        <div class="headline">
+          <div><div class="lbl">Fertig gespart in</div><div class="big" id="etaBig">–</div></div>
+          <div class="meta" id="etaDate"></div>
+        </div>
+        <div class="tblwrap"><table>
+          <thead><tr><th>Rohstoff</th><th>Kosten</th><th>Hast du</th><th>Fehlt</th><th>Einnahmen/h</th><th>Dauer</th></tr></thead>
+          <tbody id="saveBody"></tbody>
+        </table></div>
+        <label class="check"><input type="checkbox" id="usePkg" checked> Pakete, die ich habe, einrechnen</label>
+        <div class="note" id="saveNote"></div>
+      </div>
+
+      <!-- Tab 2 -->
+      <div class="tabpanel" id="p-boost" role="tabpanel" hidden>
+        <div class="row" style="align-items:end;gap:12px">
+          <div class="field" style="flex:0 1 130px"><label for="dur">Laufzeit (Stunden)</label><input id="dur" type="text" inputmode="decimal" value="168"></div>
+          <div class="presets" id="durPresets">
+            <button type="button" data-h="24">1 Tag</button><button type="button" data-h="168">7 Tage</button>
+            <button type="button" data-h="720">30 Tage</button><button type="button" data-h="2160">90 Tage</button>
+          </div>
+        </div>
+        <div class="row" style="margin-top:10px;gap:12px">
+          <div class="field" style="flex:1 1 180px"><label for="pcts">Booster-Stufen in %</label><input id="pcts" type="text" value="10, 20, 30, 40"></div>
+          <div class="field" style="flex:0 0 auto"><span class="lbl">Vergleichen mit</span>
+            <div class="seg" id="cmpSeg"><button type="button" data-v="own" aria-pressed="true">Paket gleicher Art</button><button type="button" data-v="metal" aria-pressed="false">Metallpaket</button></div>
+          </div>
+        </div>
+        <div class="tblwrap" style="margin-top:14px"><table>
+          <thead><tr><th>Booster</th><th class="t-M">Metall</th><th class="t-K">Kristall</th><th class="t-D">Deuterium</th></tr></thead>
+          <tbody id="boostBody"></tbody>
+        </table></div>
+        <div class="note" id="boostNote"></div>
+      </div>
+
+      <!-- Tab 3 -->
+      <div class="tabpanel" id="p-pkg" role="tabpanel" hidden>
+        <div class="row" style="gap:12px">
+          <div class="field" style="flex:0 1 200px"><label for="waitH">Vorher noch sparen (Stunden)</label><input id="waitH" type="text" inputmode="decimal" value="0"></div>
+          <p class="hint" style="flex:1 1 220px;margin:0">Bei 0 rechnet es nur mit deinem Vorrat. Mit z.&nbsp;B. 24 kommen Produktion und Expos von einem Tag dazu.</p>
+        </div>
+        <div class="headline" style="margin-top:14px">
+          <div><div class="lbl">Pakete nötig</div><div class="big" id="pkgBig">–</div></div>
+          <div class="meta" id="pkgMeta"></div>
+        </div>
+        <div class="tblwrap"><table>
+          <thead><tr><th>Rohstoff</th><th>Fehlt</th><th>Wert/Paket</th><th>Nötig</th><th>Hast du</th><th>Noch besorgen</th></tr></thead>
+          <tbody id="pkgBody"></tbody>
+        </table></div>
+        <div class="note" id="pkgNote"></div>
+        <h3>Kaufen oder umwandeln?</h3>
+        <div class="tblwrap"><table>
+          <thead><tr><th>Paket</th><th>Inhalt</th><th>Wert in Metall</th><th>Preis DM</th><th>Metall pro 1.000 DM</th></tr></thead>
+          <tbody id="dmBody"></tbody>
+        </table></div>
+        <div class="plans" id="dmPlans"></div>
+        <p class="hint" id="dmHint"></p>
+      </div>
+    </section>
+  </div>
+</div>
+</div>
+
+<script>
+(function(){
+const R=['M','K','D'];
+const NAME={M:'Metall',K:'Kristall',D:'Deuterium'};
+// [id, Name, Metall, Kristall, Deut, Faktor]
+const RESEARCH=[
+ ['plasma','Plasmatechnik',2000,4000,1000,2],
+ ['astro','Astrophysik',4000,8000,4000,1.75],
+ ['irn','Intergalaktisches Forschungsnetzwerk',240000,400000,160000,2],
+ ['esp','Spionagetechnik',200,1000,200,2],
+ ['comp','Computertechnik',0,400,600,2],
+ ['energy','Energietechnik',0,800,400,2],
+ ['hyper','Hyperraumtechnik',0,4000,2000,2],
+ ['laser','Lasertechnik',200,100,0,2],
+ ['ion','Ionentechnik',1000,300,100,2],
+ ['comb','Verbrennungstriebwerk',400,0,600,2],
+ ['imp','Impulstriebwerk',2000,4000,600,2],
+ ['hdrive','Hyperraumantrieb',10000,20000,6000,2],
+ ['weap','Waffentechnik',800,200,0,2],
+ ['shield','Schildtechnik',200,600,0,2],
+ ['armour','Raumschiffpanzerung',1000,0,0,2],
+ ['custom','Eigene Kosten eingeben',0,0,0,1]
+];
+const $=id=>document.getElementById(id);
+const sel=$('rs');
+RESEARCH.forEach(r=>{const o=document.createElement('option');o.value=r[0];o.textContent=r[1];sel.appendChild(o);});
+
+const AMT=/^[pesx][MKD]$/,UNIT={mio:1e6,k:1e3,exact:1};let unit='mio';
+function num(id){
+  let s=String($(id).value||'').trim().toLowerCase().replace(/[\s'’]/g,'');
+  if(!s) return 0;
+  let mult=AMT.test(id)?UNIT[unit]:1;const m=s.match(/(kkk|kk|k|mio|mrd|m|g|b)$/);
+  if(m){mult={k:1e3,kk:1e6,m:1e6,mio:1e6,kkk:1e9,mrd:1e9,g:1e9,b:1e9}[m[1]];s=s.slice(0,-m[1].length).replace(',','.');}
+  else if(/^\d{1,3}(\.\d{3})+$/.test(s)) s=s.replace(/\./g,'');
+  else s=s.replace(',','.');
+  const v=parseFloat(s);return isFinite(v)&&v>0?v*mult:0;
+}
+const full=n=>Math.round(n).toLocaleString('de-DE');
+function sh(n){const a=Math.abs(n),f=(x,d)=>x.toLocaleString('de-DE',{maximumFractionDigits:d});
+  if(a>=1e9) return f(n/1e9,2)+' Mrd'; if(a>=1e6||(unit==='mio'&&a>=1e4)) return f(n/1e6,a>=1e6?2:3)+' Mio'; if(a>=1e4) return f(n/1e3,1)+'k'; return full(n);}
+function dur(h){
+  if(!isFinite(h)) return '∞'; if(h<=0) return 'sofort';
+  const m=Math.ceil(h*60),d=Math.floor(m/1440),hh=Math.floor(m%1440/60),mm=m%60,p=[];
+  if(d)p.push(d+' T');if(hh)p.push(hh+' h');if(mm&&d<3)p.push(mm+' min');return p.join(' ')||'< 1 min';
+}
+const when=h=>new Date(Date.now()+h*3600e3).toLocaleString('de-CH',{weekday:'short',day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
+const pkFmt=x=>x.toLocaleString('de-DE',{maximumFractionDigits:2});
+
+function cost(){
+  const r=RESEARCH.find(x=>x[0]===sel.value)||RESEARCH[0];
+  if(r[0]==='custom') return {M:num('xM'),K:num('xK'),D:num('xD'),label:'Eigene Kosten'};
+  const a=Math.max(0,parseInt($('lv0').value)||0),b=Math.max(0,parseInt($('lv1').value)||0);
+  const c={M:0,K:0,D:0};
+  for(let L=a+1;L<=b;L++){R.forEach((k,i)=>{let v=r[2+i]*Math.pow(r[5],L-1);v=r[0]==='astro'?Math.round(v/100)*100:Math.floor(v);c[k]+=v;});}
+  c.label=b>a?(r[1]+' '+(b-a>1?(a+1)+'–'+b:b)):'';
+  return c;
+}
+
+let cmp='own';const MONTH_H=730;
+function calc(){
+  const P={},E={},S={},H={},C={},W={},inc={},pv={};
+  const rt={M:num('rM')||3,K:num('rK')||2,D:num('rD')||1};
+  R.forEach(k=>{P[k]=num('p'+k);E[k]=num('e'+k);S[k]=num('s'+k);H[k]=num('h'+k);C[k]=num('c'+k);
+    W[k]=rt.M/rt[k]; inc[k]=P[k]+E[k]/MONTH_H; pv[k]=P[k]*H[k];});
+  const hA=num('hA'),cA=num('cA'),pa={};R.forEach(k=>pa[k]=P[k]*hA);
+  $('pkgAInfo').innerHTML=R.map(k=>'<span class="t-'+k+'">'+sh(pa[k])+'</span>').join(' · ');
+  const c=cost(),isCustom=sel.value==='custom';
+  $('customBox').hidden=!isCustom; $('lv0').disabled=isCustom; $('lv1').disabled=isCustom;
+  $('expoInfo').innerHTML=R.map(k=>'<span class="t-'+k+'">'+sh(E[k]/MONTH_H)+'/h</span>').join(' · ');
+  $('pkgInfo').innerHTML=R.map(k=>'<span class="t-'+k+'">'+sh(pv[k])+'</span>').join(' · ');
+
+  const tot=R.reduce((s,k)=>s+c[k],0);
+  $('costLine').innerHTML=tot?R.map(k=>'<span class="t-'+k+'">'+NAME[k]+' '+full(c[k])+'</span>').join('')
+    :'<span class="hint" style="margin:0">'+(isCustom?'Trag die Kosten oben ein.':'Zielstufe muss höher sein als die aktuelle Stufe.')+'</span>';
+
+  // Tab 1
+  const usePkg=$('usePkg').checked;let maxH=0,bott=null;const rows=[];
+  R.forEach(k=>{const have=S[k]+(usePkg?C[k]*pv[k]+cA*pa[k]:0),miss=Math.max(0,c[k]-have),h=miss>0?(inc[k]>0?miss/inc[k]:Infinity):0;
+    rows.push({k,have,miss,h}); if(h>maxH){maxH=h;bott=k;}});
+  $('saveBody').innerHTML=rows.map(r=>{const pct=c[r.k]?Math.min(100,r.have/c[r.k]*100):100;
+    return '<tr class="'+(r.k===bott?'bott':'')+'"><td class="name t-'+r.k+'">'+NAME[r.k]+(r.k===bott?' <span class="pill">Engpass</span>':'')+
+    '<div class="bar"><i class="c-'+r.k+'" style="width:'+pct+'%"></i></div></td><td>'+sh(c[r.k])+'</td><td>'+sh(r.have)+'</td><td>'+(r.miss?sh(r.miss):'<span class="win">0</span>')+
+    '</td><td>'+sh(inc[r.k])+'</td><td>'+dur(r.h)+'</td></tr>';}).join('');
+  if(!tot){$('etaBig').textContent='–';$('etaDate').textContent='';}
+  else if(maxH===0){$('etaBig').textContent='Sofort';$('etaDate').innerHTML='<span class="pill ok">Genug da</span>';}
+  else{$('etaBig').textContent=dur(maxH);$('etaDate').textContent=isFinite(maxH)?'ca. '+when(maxH):'Für '+NAME[bott]+' hast du keine Einnahmen.';}
+  // Händler
+  const needV=R.reduce((s,k)=>s+(c[k]-S[k]-(usePkg?C[k]*pv[k]+cA*pa[k]:0))*W[k],0),incV=R.reduce((s,k)=>s+inc[k]*W[k],0);
+  const tH=needV<=0?0:(incV>0?needV/incV:Infinity);
+  const expoShare=R.map(k=>'<span class="t-'+k+'">'+sh(E[k]/MONTH_H)+'</span>').join(' · ');
+  $('saveNote').innerHTML='<p><strong>Mit Händler ('+rt.M+':'+rt.K+':'+rt.D+'):</strong> '+(tot?dur(tH)+(tH>0&&isFinite(tH)?' (ca. '+when(tH)+')':''):'–')+
+    '. Überschüsse werden dabei in den fehlenden Rohstoff getauscht.</p><p>Davon kommt pro Stunde aus Expos: '+expoShare+'.</p>';
+
+  // Tab 2
+  const Hd=num('dur'),pcts=$('pcts').value.split(/[,;\s]+/).map(x=>parseFloat(x.replace(',','.'))).filter(x=>x>0);
+  const ref=k=>cmp==='own'?pv[k]:pv.M, val=(k,x)=>cmp==='own'?x:x*W[k];
+  let html='';
+  pcts.forEach(p=>{html+='<tr><td class="name">+'+pkFmt(p)+' %</td>'+R.map(k=>{const ex=P[k]*p/100*Hd,rf=ref(k),r=rf>0?val(k,ex)/rf:0;
+    return '<td>'+sh(ex)+'<span class="cell-sub '+(r>=1?'win':'lose')+'">≈ '+pkFmt(r)+' Pakete</span><div class="bar"><i class="c-'+k+'" style="width:'+Math.min(100,r*50)+'%"></i></div></td>';}).join('')+'</tr>';});
+  html+='<tr><td class="name">1 Paket</td>'+R.map(k=>{const rf=cmp==='own'?pv[k]:pv.M;return '<td>'+sh(rf)+'<span class="cell-sub">'+(cmp==='own'?pkFmt(H[k])+' h '+NAME[k]:pkFmt(H.M)+' h Metall')+'</span></td>';}).join('')+'</tr>';
+  $('boostBody').innerHTML=html;
+  const hRef=cmp==='own'?null:H.M;
+  $('boostNote').innerHTML='<p><strong>Faustregel:</strong> Ein Booster mit p % über T Stunden bringt T × p ÷ 100 Stunden Produktion. '+
+    'Bei '+pkFmt(Hd)+' h Laufzeit entspricht das:</p><p>'+pcts.map(p=>'+'+pkFmt(p)+' % → '+pkFmt(Hd*p/100)+' h Produktion').join(' · ')+'</p>'+
+    (pcts.length?'<p>Gleichstand mit einem '+pkFmt(hRef||H.M)+'-h-Paket: '+pcts.map(p=>'+'+pkFmt(p)+' % ab '+dur((hRef||H.M)*100/p)).join(' · ')+
+    (cmp==='metal'?'. Kristall und Deut sind über den Händlerkurs in Metall umgerechnet.':'')+'</p>':'');
+
+  // Tab 3
+  const wait=num('waitH');let totNeed=0,totBuy=0;
+  const miss0={};R.forEach(k=>miss0[k]=Math.max(0,c[k]-S[k]-inc[k]*wait));
+  const allNeed=Math.max(0,...R.map(k=>miss0[k]>0?(pa[k]>0?Math.ceil(miss0[k]/pa[k]):Infinity):0)),allBuy=Math.max(0,allNeed-cA);
+  const BUY={};
+  $('pkgBody').innerHTML=R.map(k=>{const miss=Math.max(0,miss0[k]-cA*pa[k]),need=miss>0?(pv[k]>0?Math.ceil(miss/pv[k]):Infinity):0,buy=Math.max(0,need-C[k]);
+    totNeed+=need;totBuy+=buy;BUY[k]=buy;
+    return '<tr><td class="name t-'+k+'">'+NAME[k]+'</td><td>'+sh(miss)+'</td><td>'+sh(pv[k])+'</td><td>'+(isFinite(need)?need:'–')+'</td><td>'+full(C[k])+
+      '</td><td>'+(isFinite(buy)?(buy?'<strong>'+buy+'</strong>':'<span class="win">0</span>'):'–')+'</td></tr>';}).join('');
+  $('pkgBig').textContent=tot?(isFinite(totNeed)?totNeed:'∞'):'–';
+  $('pkgMeta').innerHTML=!tot?'':(isFinite(totBuy)?(totBuy?'davon fehlen dir noch <strong>'+totBuy+'</strong>':'<span class="pill ok">Hast du alle</span>'):'Paketwert 0: Produktion oder Stunden fehlen');
+  $('pkgNote').innerHTML=(cA>0?'<p>Deine '+full(cA)+' Komplettpakete sind schon abgezogen, die Tabelle zeigt nur noch Einzelpakete.</p>':'')+
+    (tot?'<p><strong>Nur mit Komplettpaketen:</strong> '+(isFinite(allNeed)?allNeed+' nötig, du hast '+full(cA)+(allBuy?', fehlen <strong>'+allBuy+'</strong>':', reicht')+'.':'nicht möglich, Paketwert ist 0.')+'</p>':'')+
+    '<p>Aufgerundet auf ganze Pakete. Nach '+dur(wait)+' Sparen hast du zusätzlich '+R.map(k=>'<span class="t-'+k+'">'+sh(inc[k]*wait)+'</span>').join(' · ')+'.</p>'+
+    '<p>Ohne Pakete dauert es '+dur(Math.max(...R.map(k=>{const m=Math.max(0,c[k]-S[k]);return m?(inc[k]>0?m/inc[k]:Infinity):0;})))+'.</p>';
+
+  // Dunkle Materie
+  const price={M:num('dM'),K:num('dK'),D:num('dD'),A:num('dA')};
+  const types=R.map(k=>({id:k,name:NAME[k]+'paket',inh:'<span class="t-'+k+'">'+sh(pv[k])+'</span>',val:pv[k]*W[k],dm:price[k]}));
+  types.forEach(t=>{t.cont={M:0,K:0,D:0};t.cont[t.id]=pv[t.id];});
+  types.push({id:'A',cont:pa,name:'Komplettpaket',inh:R.map(k=>'<span class="t-'+k+'">'+sh(pa[k])+'</span>').join(' · '),val:R.reduce((s,k)=>s+pa[k]*W[k],0),dm:price.A});
+  types.forEach(t=>t.eff=t.dm>0&&t.val>0?t.val/t.dm*1000:0);
+  const best=types.filter(t=>t.eff>0).sort((a,b)=>b.eff-a.eff)[0];
+  $('dmBody').innerHTML=types.map(t=>'<tr class="'+(best&&t.id===best.id?'best':'')+'"><td class="name">'+t.name+(best&&t.id===best.id?' <span class="pill">Bestes</span>':'')+
+    '</td><td>'+t.inh+'</td><td>'+sh(t.val)+'</td><td>'+(t.dm?full(t.dm):'–')+'</td><td>'+(t.eff?sh(t.eff):'–')+'</td></tr>').join('');
+  // Plan A: jeweils passende Pakete kaufen
+  const dmA=R.reduce((s,k)=>s+(BUY[k]?(price[k]>0?BUY[k]*price[k]:Infinity):0),0);
+  // Plan B: nur bestes Paket kaufen, Rest über Händler tauschen (Überschüsse zählen mit)
+  const restV=R.reduce((s,k)=>s+(c[k]-S[k]-inc[k]*wait-C[k]*pv[k]-cA*pa[k])*W[k],0);
+  const dRest={};R.forEach(k=>dRest[k]=c[k]-S[k]-inc[k]*wait-C[k]*pv[k]-cA*pa[k]);
+  const fee=num('tF'),calls=Math.max(1,Math.round(num('tN'))||1),loss0=Math.min(95,num('tL'))/100;
+  function planB(L){
+    if(!best||restV<=0) return {n:0,dm:best?0:Infinity,trade:false};
+    let n=Math.max(0,Math.ceil(restV/best.val));
+    for(let i=0;i<200000;i++,n++){
+      let need=0,avail=0;R.forEach(k=>{const x=n*best.cont[k]-dRest[k];if(x<0)need-=x*W[k];else avail+=x*W[k];});
+      if(need<=0) return {n,dm:n*best.dm,trade:false};
+      if(avail*(1-L)>=need) return {n,dm:n*best.dm+calls*fee,trade:true};
+    }
+    return {n:Infinity,dm:Infinity,trade:true};
+  }
+  const pB=planB(loss0),nB=pB.n,dmB=pB.dm;
+  let breakEven=null;
+  if(best&&isFinite(dmA)&&pB.trade){if(planB(0).dm>dmA)breakEven=-1;else{breakEven=0;for(let l=1;l<=90;l++){if(planB(l/100).dm<=dmA)breakEven=l;else break;}}}
+  let plans='';
+  if(!tot){plans='<div class="plan"><p>Wähle oben eine Forschung, dann siehst du hier, was am wenigsten DM kostet.</p></div>';}
+  else if(totBuy===0&&restV<=0){plans='<div class="plan win-plan"><div class="v">0 DM</div><p>Du hast schon genug, nichts kaufen.</p></div>';}
+  else{
+    const aWin=dmA<=dmB;
+    plans='<div class="plan'+(aWin?' win-plan':'')+'"><div class="lbl">Passend kaufen, nicht tauschen</div><div class="v">'+(isFinite(dmA)?full(dmA)+' DM':'–')+'</div><p>'+
+      R.filter(k=>BUY[k]).map(k=>BUY[k]+'× '+NAME[k]).join(', ')+(isFinite(dmA)?'':' · Preis fehlt')+'</p></div>'+
+      '<div class="plan'+(!aWin?' win-plan':'')+'"><div class="lbl">Nur '+(best?best.name:'bestes Paket')+' + Händler</div><div class="v">'+(isFinite(dmB)?full(dmB)+' DM':'–')+'</div><p>'+
+      (best?(isFinite(nB)?nB+'× '+best.name:'nicht möglich')+(pB.trade?' + '+calls+'× Händler ('+full(calls*fee)+' DM), Kurs '+rt.M+':'+rt.K+':'+rt.D+(loss0?' minus '+pkFmt(loss0*100)+' %':''):', kein Tausch nötig'):'Preise fehlen')+'</p></div>';
+    if(isFinite(dmA)&&isFinite(dmB)&&dmA!==dmB){const d=Math.abs(dmA-dmB);plans+='<div class="plan"><div class="lbl">Ersparnis</div><div class="v">'+full(d)+' DM</div><p>'+(aWin?'Direkt kaufen ist günstiger, Tauschen lohnt sich hier nicht.':'Mit dem Händler sparst du '+Math.round(d/Math.max(dmA,1)*100)+' %.')+'</p></div>';}
+  }
+  if(breakEven!==null&&tot){plans+='<div class="plan"><div class="lbl">Wann lohnt der Händler?</div><div class="v">'+(breakEven<0?'nie':breakEven>=90?'fast immer':'bis '+breakEven+' %')+'</div><p>'+
+    (breakEven<0?'Selbst zum vollen Kurs ist direkt kaufen günstiger.':'Tauschen bleibt günstiger, solange der Händler höchstens '+breakEven+' % schlechter ist als '+rt.M+':'+rt.K+':'+rt.D+'.')+'</p></div>';}
+  $('dmPlans').innerHTML=plans;
+  $('dmHint').textContent='Der Wert eines Pakets hängt von deiner Produktion ab, weil es Stunden deiner Produktion bringt. Kristall und Deut sind über den Händlerkurs in Metall umgerechnet. Beim Tauschen sind die DM für den Händler und dein Kursverlust eingerechnet.';
+}
+
+// Speichern
+const KEY='ogame-sparrechner-v2',OLDKEY='ogame-sparrechner-v1';
+const ids=[...document.querySelectorAll('input,select')].map(e=>e.id).filter(Boolean);
+const defaults={};ids.forEach(id=>{const e=$(id);defaults[id]=e.type==='checkbox'?e.checked:e.value;});
+function save(){const o={cmp,unit,tab:curTab,expo:'month'};ids.forEach(id=>{const e=$(id);o[id]=e.type==='checkbox'?e.checked:e.value;});
+  try{localStorage.setItem(KEY,JSON.stringify(o));}catch(_){}}
+let curTab='save';
+function load(){try{let o=JSON.parse(localStorage.getItem(KEY)||'null');
+  if(!o){o=JSON.parse(localStorage.getItem(OLDKEY)||'null');if(o)o.unit='exact';}
+  if(!o)return;if(o.unit in UNIT)unit=o.unit;
+  if(o.expo!=='month'){delete o.eM;delete o.eK;delete o.eD;}
+  ids.forEach(id=>{if(id in o){const e=$(id);if(e.type==='checkbox')e.checked=o[id];else e.value=o[id];}});
+  if(o.cmp)cmp=o.cmp;if(o.tab)curTab=o.tab;$('exampleNote').hidden=true;}catch(_){}}
+
+function setTab(t){curTab=t;['save','boost','pkg'].forEach(x=>{$('tab-'+x).setAttribute('aria-selected',x===t);$('p-'+x).hidden=x!==t;});}
+['save','boost','pkg'].forEach(x=>$('tab-'+x).addEventListener('click',()=>{setTab(x);save();}));
+const UNITHINT={mio:'Zahlen ohne Endung zählen als Millionen, z. B. 1,2 = 1.200.000.',k:'Zahlen ohne Endung zählen als Tausend, z. B. 450 = 450.000.',exact:'Zahlen werden genau so genommen, z. B. 1.200.000.'};
+function setUnit(v){unit=v;document.querySelectorAll('#unitSeg button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.v===v));$('unitHint').textContent=UNITHINT[v];}
+document.querySelectorAll('#unitSeg button').forEach(b=>b.addEventListener('click',()=>{setUnit(b.dataset.v);calc();save();}));
+function setCmp(v){cmp=v;document.querySelectorAll('#cmpSeg button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.v===v));}
+document.querySelectorAll('#cmpSeg button').forEach(b=>b.addEventListener('click',()=>{setCmp(b.dataset.v);calc();save();}));
+document.querySelectorAll('#durPresets button').forEach(b=>b.addEventListener('click',()=>{$('dur').value=b.dataset.h;calc();save();}));
+document.addEventListener('input',e=>{if(e.target.matches('input,select')){calc();save();$('exampleNote').hidden=true;}});
+document.addEventListener('change',e=>{if(e.target.matches('input,select')){calc();save();}});
+$('resetBtn').addEventListener('click',()=>{ids.forEach(id=>{const e=$(id);if(e.type==='checkbox')e.checked=defaults[id];else e.value=defaults[id];});
+  setCmp('own');setUnit('mio');try{localStorage.removeItem(KEY);localStorage.removeItem(OLDKEY);}catch(_){} $('exampleNote').hidden=false;calc();});
+
+load();setTab(['save','boost','pkg'].includes(curTab)?curTab:'save');setCmp(cmp);setUnit(unit);calc();
+})();
+</script>
+
+</body>
+</html>
