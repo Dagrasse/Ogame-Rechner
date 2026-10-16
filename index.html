@@ -280,11 +280,22 @@ img{max-width:100%}
             <div class="seg" id="cmpSeg"><button type="button" data-v="own" aria-pressed="true">Paket gleicher Art</button><button type="button" data-v="metal" aria-pressed="false">Metallpaket</button></div>
           </div>
         </div>
-        <div class="tblwrap" style="margin-top:14px"><table>
-          <thead><tr><th>Booster</th><th class="t-M">Metall</th><th class="t-K">Kristall</th><th class="t-D">Deuterium</th></tr></thead>
+        <div class="row" style="margin-top:10px;gap:12px">
+          <div class="field" style="flex:1 1 240px"><label for="bPl">Booster auf Planet</label><select id="bPl"><option value="auto">Bester Planet je Rohstoff</option></select></div>
+        </div>
+        <p class="hint" id="plHint"></p>
+        <div class="tblwrap" style="margin-top:10px"><table>
+          <thead><tr><th>Booster</th><th class="t-M">Metall<span class="cell-sub" id="bhM"></span></th><th class="t-K">Kristall<span class="cell-sub" id="bhK"></span></th><th class="t-D">Deuterium<span class="cell-sub" id="bhD"></span></th></tr></thead>
           <tbody id="boostBody"></tbody>
         </table></div>
         <div class="note" id="boostNote"></div>
+        <div id="plWrap" hidden>
+          <h3>Deine Planeten <small style="font-family:var(--f-body);text-transform:none;letter-spacing:0;color:var(--muted);font-weight:400">Produktion pro Stunde</small></h3>
+          <div class="tblwrap"><table>
+            <thead><tr><th>Planet</th><th class="t-M">Metall</th><th class="t-K">Kristall</th><th class="t-D">Deuterium</th></tr></thead>
+            <tbody id="plBody"></tbody>
+          </table></div>
+        </div>
       </div>
 
       <!-- Tab 3 -->
@@ -381,7 +392,9 @@ function cost(){
   return c;
 }
 
-let cmp='own';const MONTH_H=730;
+const esc=t=>String(t).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+let cmp='own',PL=[];
+function fillPl(){const s=$('bPl'),v=s.value;s.innerHTML='<option value="auto">Bester Planet je Rohstoff</option>'+PL.map((p,i)=>'<option value="'+i+'">'+esc(p.n+' '+p.c)+'</option>').join('');s.value=[...s.options].some(o=>o.value===v)?v:'auto';}const MONTH_H=730;
 function calc(){
   const P={},E={},S={},H={},C={},W={},inc={},pv={};
   const rt={M:num('rM')||3,K:num('rK')||2,D:num('rD')||1};
@@ -419,16 +432,26 @@ function calc(){
   // Tab 2
   const Hd=num('dur'),pcts=$('pcts').value.split(/[,;\s]+/).map(x=>parseFloat(x.replace(',','.'))).filter(x=>x>0);
   const ref=k=>cmp==='own'?pv[k]:pv.M, val=(k,x)=>cmp==='own'?x:x*W[k];
+  const BP={},BN={},selPl=$('bPl').value;
+  R.forEach(k=>{if(!PL.length){BP[k]=P[k];BN[k]='';return;}
+    let pl=selPl!=='auto'?PL[+selPl]:null; if(!pl) pl=PL.reduce((a,b)=>b[k]>a[k]?b:a);
+    BP[k]=pl[k];BN[k]=pl.n;});
+  R.forEach(k=>{$('bh'+k).textContent=BN[k]?BN[k]+' · '+sh(BP[k])+'/h':'';});
+  $('plHint').innerHTML=PL.length?'Ein Booster wirkt nur auf einem Planeten. Gerechnet wird mit der Produktion des gewählten Planeten. Die Pakete richten sich nach deiner Gesamtproduktion.'
+    :'<strong>Achtung:</strong> Ohne Planetenliste rechnet der Booster hier mit deiner Gesamtproduktion, also zu hoch. Kopiere im Tracker <b>Imperium → Produktion</b> ins Import-Feld, dann kommen deine Planeten dazu.';
   let html='';
-  pcts.forEach(p=>{html+='<tr><td class="name">+'+pkFmt(p)+' %</td>'+R.map(k=>{const ex=P[k]*p/100*Hd,rf=ref(k),r=rf>0?val(k,ex)/rf:0;
+  pcts.forEach(p=>{html+='<tr><td class="name">+'+pkFmt(p)+' %</td>'+R.map(k=>{const ex=BP[k]*p/100*Hd,rf=ref(k),r=rf>0?val(k,ex)/rf:0;
     return '<td>'+sh(ex)+'<span class="cell-sub '+(r>=1?'win':'lose')+'">≈ '+pkFmt(r)+' Pakete</span><div class="bar"><i class="c-'+k+'" style="width:'+Math.min(100,r*50)+'%"></i></div></td>';}).join('')+'</tr>';});
   html+='<tr><td class="name">1 Paket</td>'+R.map(k=>{const rf=cmp==='own'?pv[k]:pv.M;return '<td>'+sh(rf)+'<span class="cell-sub">'+(cmp==='own'?pkFmt(H[k])+' h '+NAME[k]:pkFmt(H.M)+' h Metall')+'</span></td>';}).join('')+'</tr>';
   $('boostBody').innerHTML=html;
-  const hRef=cmp==='own'?null:H.M;
-  $('boostNote').innerHTML='<p><strong>Faustregel:</strong> Ein Booster mit p % über T Stunden bringt T × p ÷ 100 Stunden Produktion. '+
-    'Bei '+pkFmt(Hd)+' h Laufzeit entspricht das:</p><p>'+pcts.map(p=>'+'+pkFmt(p)+' % → '+pkFmt(Hd*p/100)+' h Produktion').join(' · ')+'</p>'+
-    (pcts.length?'<p>Gleichstand mit einem '+pkFmt(hRef||H.M)+'-h-Paket: '+pcts.map(p=>'+'+pkFmt(p)+' % ab '+dur((hRef||H.M)*100/p)).join(' · ')+
-    (cmp==='metal'?'. Kristall und Deut sind über den Händlerkurs in Metall umgerechnet.':'')+'</p>':'');
+  $('boostNote').innerHTML='<p><strong>Ab welcher Laufzeit schlägt der Booster ein Paket?</strong></p>'+R.map(k=>'<p><span class="t-'+k+'">'+NAME[k]+(BN[k]?' ('+esc(BN[k])+')':'')+':</span> '+
+    pcts.map(p=>{const perH=val(k,BP[k]*p/100);return '+'+pkFmt(p)+' % ab '+(perH>0?dur(ref(k)/perH):'∞');}).join(' · ')+'</p>').join('')+
+    (cmp==='metal'?'<p>Kristall und Deut sind über den Händlerkurs in Metall umgerechnet.</p>':'')+
+    '<p class="hint" style="margin:0">Falls ein Booster im Spiel nur auf die Grundproduktion der Minen wirkt, ist sein Ertrag etwas tiefer als hier.</p>';
+  $('plWrap').hidden=!PL.length;
+  if(PL.length){const top={};R.forEach(k=>top[k]=Math.max(...PL.map(p=>p[k])));
+    $('plBody').innerHTML=PL.map((p,i)=>'<tr'+(selPl==String(i)?' class="bott"':'')+'><td class="name">'+esc(p.n)+' <span class="cell-sub" style="display:inline">'+p.c+'</span></td>'+
+      R.map(k=>'<td>'+(p[k]===top[k]?'<span class="pill">Top</span> ':'')+sh(p[k])+'</td>').join('')+'</tr>').join('');}
 
   // Tab 3
   const wait=num('waitD')*24;let totNeed=0,totBuy=0;
@@ -548,13 +571,14 @@ function calc(){
 const KEY='ogame-sparrechner-v2',OLDKEY='ogame-sparrechner-v1';
 const ids=[...document.querySelectorAll('input,select')].map(e=>e.id).filter(Boolean);
 const defaults={};ids.forEach(id=>{const e=$(id);defaults[id]=e.type==='checkbox'?e.checked:e.value;});
-function save(){const o={cmp,unit,tab:curTab,expo:'month'};ids.forEach(id=>{const e=$(id);o[id]=e.type==='checkbox'?e.checked:e.value;});
+function save(){const o={cmp,unit,tab:curTab,expo:'month',planets:PL};ids.forEach(id=>{const e=$(id);o[id]=e.type==='checkbox'?e.checked:e.value;});
   try{localStorage.setItem(KEY,JSON.stringify(o));}catch(_){}}
 let curTab='save';
 function load(){try{let o=JSON.parse(localStorage.getItem(KEY)||'null');
   if(!o){o=JSON.parse(localStorage.getItem(OLDKEY)||'null');if(o)o.unit='exact';}
   if(!o)return;if(o.unit in UNIT)unit=o.unit;
   if(o.expo!=='month'){delete o.eM;delete o.eK;delete o.eD;}
+  if(Array.isArray(o.planets)){PL=o.planets;fillPl();}
   ids.forEach(id=>{if(id in o){const e=$(id);if(e.type==='checkbox')e.checked=o[id];else e.value=o[id];}});
   if(o.cmp)cmp=o.cmp;if(o.tab)curTab=o.tab;$('exampleNote').hidden=true;}catch(_){}}
 
@@ -571,9 +595,16 @@ function numsIn(line){return (line.match(/\d{1,3}(?:\.\d{3})+(?:,\d+)?|\d+(?:,\d
 function setAmt(id,v){const d=v/UNIT[unit];$(id).value=d.toLocaleString('de-DE',{maximumFractionDigits:d>=100?1:3,useGrouping:false});}
 function trkImport(){
   const txt=$('trkPaste').value,lines=txt.split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
-  const out=[];let prod=null;const exp={};
+  const out=[];let prod=null;const exp={};const pls=[];
+  const isNumLine=x=>/^[\d.,\s\t]+$/.test(x);
   lines.forEach((l,i)=>{
     const low=l.toLowerCase();
+    const cm=l.match(/\[(\d+:\d+:\d+)\]/);
+    if(cm){let name=l.slice(0,cm.index).replace(/[\t]/g,' ').trim();if(!name&&i>0&&!isNumLine(lines[i-1]))name=lines[i-1];
+      let n=numsIn(l.slice(cm.index+cm[0].length)).filter(x=>x>=1000);
+      for(let j=i+1;j<lines.length&&n.length<3&&!/\[\d+:\d+:\d+\]/.test(lines[j]);j++){if(!isNumLine(lines[j])&&j>i+1&&n.length)break;n=n.concat(numsIn(lines[j]).filter(x=>x>=1000));}
+      if(n.length>=3)pls.push({n:name||cm[1],c:'['+cm[1]+']',M:n[0],K:n[1],D:n[2]});
+    }
     if(!prod&&/^gesamt\s*pro\s*stunde/.test(low)){
       let n=numsIn(l).filter(x=>x>=1000);
       if(n.length<3){for(let j=i+1;j<lines.length&&n.length<3;j++){n=n.concat(numsIn(lines[j]).filter(x=>x>=1000));}}
@@ -586,6 +617,7 @@ function trkImport(){
   });
   if(prod){R.forEach(k=>setAmt('p'+k,prod[k]));
     out.push('<span class="ok">Produktion übernommen</span> pro Stunde: '+R.map(k=>'<span class="t-'+k+'">'+sh(prod[k])+'</span>').join(' · '));}
+  if(pls.length){PL=pls;fillPl();out.push('<span class="ok">'+pls.length+' Planeten übernommen</span> für den Booster-Vergleich');}
   if(R.every(k=>k in exp)){const f=MONTH_H/24;R.forEach(k=>setAmt('e'+k,exp[k]*f));
     out.push('<span class="ok">Expos übernommen</span> aus Ø pro Tag × '+pkFmt(f)+' Tage: '+R.map(k=>'<span class="t-'+k+'">'+sh(exp[k]*f)+'</span>').join(' · ')+' pro Monat'+(num('eZ')?', plus '+pkFmt(num('eZ'))+' % Zuschlag':''));}
   if(!out.length){$('trkMsg').textContent='Nichts erkannt. Kopiere die ganze Tabelle mit den Zeilen „gesamt pro Stunde“ oder „Metall / Kristall / Deuterium“.';$('trkOut').hidden=true;return;}
@@ -602,7 +634,7 @@ document.querySelectorAll('#durPresets button').forEach(b=>b.addEventListener('c
 document.addEventListener('input',e=>{if(e.target.matches('input,select')){calc();save();$('exampleNote').hidden=true;}});
 document.addEventListener('change',e=>{if(e.target.matches('input,select')){calc();save();}});
 $('resetBtn').addEventListener('click',()=>{ids.forEach(id=>{const e=$(id);if(e.type==='checkbox')e.checked=defaults[id];else e.value=defaults[id];});
-  setCmp('own');setUnit('mio');try{localStorage.removeItem(KEY);localStorage.removeItem(OLDKEY);}catch(_){} $('exampleNote').hidden=false;calc();});
+  PL=[];fillPl();setCmp('own');setUnit('mio');try{localStorage.removeItem(KEY);localStorage.removeItem(OLDKEY);}catch(_){} $('exampleNote').hidden=false;calc();});
 
 load();setTab(['save','boost','pkg'].includes(curTab)?curTab:'save');setCmp(cmp);setUnit(unit);calc();
 })();
