@@ -105,6 +105,13 @@ tr.best td{background:var(--accent-soft)}
 .plan.win-plan{border-color:var(--accent)}
 .plan .v{font-family:var(--f-display);font-weight:700;font-size:1.6rem;line-height:1.1}
 .plan p{margin:4px 0 0;font-size:.85rem;color:var(--muted)}
+textarea{width:100%;box-sizing:border-box;font:400 .8rem var(--f-mono);color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:4px;padding:6px 8px;resize:vertical}
+textarea:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.btn{font:600 .85rem var(--f-body);background:var(--accent);color:var(--panel);border:0;border-radius:4px;padding:7px 12px;cursor:pointer}
+.btn:hover{filter:brightness(1.08)}
+.trkout{margin-top:10px;font-size:.85rem;display:flex;flex-direction:column;gap:4px}
+.trkout .ok{color:var(--good);font-weight:600}
+.expoShare{display:flex;flex-wrap:wrap;gap:4px 14px;margin-top:6px;font-size:.82rem}
 .reset{font:500 .78rem var(--f-body);background:none;border:0;color:var(--muted);text-decoration:underline;cursor:pointer;padding:0}
 </style>
 
@@ -126,6 +133,16 @@ img{max-width:100%}
   <!-- Eingaben -->
   <div class="stack">
     <section class="panel">
+      <h2>Aus OGame Tracker übernehmen</h2>
+      <p class="hint" style="margin:0 0 8px">Im Tracker die Tabelle markieren (Strg+A), kopieren (Strg+C) und hier einfügen. Geht mit <b>Imperium → Produktion</b> und <b>Expeditionen → Rohstofffunde → Menge → Tabelle</b>, einzeln oder beide nacheinander.</p>
+      <textarea id="trkPaste" rows="3" placeholder="Hier einfügen…" spellcheck="false"></textarea>
+      <div class="row" style="margin-top:8px;align-items:center">
+        <button type="button" class="btn" id="trkBtn">Werte übernehmen</button>
+        <span class="hint" style="margin:0" id="trkMsg"></span>
+      </div>
+      <div class="trkout" id="trkOut" hidden></div>
+    </section>
+    <section class="panel">
       <div class="unitbar">
         <span class="lbl">Rohstoffe eingeben in</span>
         <div class="seg" id="unitSeg"><button type="button" data-v="mrd" aria-pressed="false">Milliarden</button><button type="button" data-v="mio" aria-pressed="true">Millionen</button><button type="button" data-v="k" aria-pressed="false">Tausend</button><button type="button" data-v="exact" aria-pressed="false">Genau</button></div>
@@ -143,6 +160,10 @@ img{max-width:100%}
           <div class="field"><label class="lbl-M" for="eM">Metall</label><input id="eM" type="text" inputmode="decimal" value="3000"></div>
           <div class="field"><label class="lbl-K" for="eK">Kristall</label><input id="eK" type="text" inputmode="decimal" value="1500"></div>
           <div class="field"><label class="lbl-D" for="eD">Deuterium</label><input id="eD" type="text" inputmode="decimal" value="500"></div>
+        </div>
+        <div class="row" style="margin-top:8px">
+          <div class="field" style="flex:0 1 180px"><label for="eZ">Zuschlag nicht getrackt %</label><input id="eZ" type="text" inputmode="decimal" value="25"></div>
+          <p class="hint" style="flex:1 1 180px;margin:0">Für Expos, die du nicht im Tracker gespeichert hast. Wird auf die Werte links dazugerechnet.</p>
         </div>
         <p class="hint">Gesamtertrag aller Expos in einem Monat. Wird gleichmässig auf die Stunden verteilt (Ø 30,4 Tage = 730 h): <span id="expoInfo"></span></p>
       </div>
@@ -317,7 +338,7 @@ function num(id){
   if(!s) return 0;
   let mult=AMT.test(id)?UNIT[unit]:1;const m=s.match(/(kkk|kk|k|mio|mrd|m|g|b)$/);
   if(m){mult={k:1e3,kk:1e6,m:1e6,mio:1e6,kkk:1e9,mrd:1e9,g:1e9,b:1e9}[m[1]];s=s.slice(0,-m[1].length).replace(',','.');}
-  else if(/^\d{1,3}(\.\d{3})+$/.test(s)) s=s.replace(/\./g,'');
+  else if(/^\d{1,3}(\.\d{3})+(,\d+)?$/.test(s)) s=s.replace(/\./g,'').replace(',','.');
   else s=s.replace(',','.');
   const v=parseFloat(s);return isFinite(v)&&v>0?v*mult:0;
 }
@@ -347,7 +368,7 @@ function calc(){
   const P={},E={},S={},H={},C={},W={},inc={},pv={};
   const rt={M:num('rM')||3,K:num('rK')||2,D:num('rD')||1};
   R.forEach(k=>{P[k]=num('p'+k);E[k]=num('e'+k);S[k]=num('s'+k);H[k]=num('h'+k);C[k]=num('c'+k);
-    W[k]=rt.M/rt[k]; inc[k]=P[k]+E[k]/MONTH_H; pv[k]=P[k]*H[k];});
+    W[k]=rt.M/rt[k]; E[k]*=1+num('eZ')/100; inc[k]=P[k]+E[k]/MONTH_H; pv[k]=P[k]*H[k];});
   const hA=num('hA'),cA=num('cA'),pa={};R.forEach(k=>pa[k]=P[k]*hA);
   $('pkgAInfo').innerHTML=R.map(k=>'<span class="t-'+k+'">'+sh(pa[k])+'</span>').join(' · ');
   const c=cost(),isCustom=sel.value==='custom';
@@ -469,6 +490,39 @@ function load(){try{let o=JSON.parse(localStorage.getItem(KEY)||'null');
 function setTab(t){curTab=t;['save','boost','pkg'].forEach(x=>{$('tab-'+x).setAttribute('aria-selected',x===t);$('p-'+x).hidden=x!==t;});}
 ['save','boost','pkg'].forEach(x=>$('tab-'+x).addEventListener('click',()=>{setTab(x);save();}));
 const UNITHINT={mrd:'Zahlen ohne Endung zählen als Milliarden, z. B. 1,5 = 1.500.000.000.',mio:'Zahlen ohne Endung zählen als Millionen, z. B. 1,2 = 1.200.000.',k:'Zahlen ohne Endung zählen als Tausend, z. B. 450 = 450.000.',exact:'Zahlen werden genau so genommen, z. B. 1.200.000.'};
+
+// Import aus OGame Tracker
+function deNum(t){t=t.replace(/[^\d.,]/g,'');if(!t)return NaN;
+  if(/,/.test(t))return parseFloat(t.replace(/\./g,'').replace(',','.'));
+  if(/^\d{1,3}(\.\d{3})+$/.test(t))return parseFloat(t.replace(/\./g,''));
+  return parseFloat(t);}
+function numsIn(line){return (line.match(/\d{1,3}(?:\.\d{3})+(?:,\d+)?|\d+(?:,\d+)?/g)||[]).map(deNum).filter(isFinite);}
+function setAmt(id,v){const d=v/UNIT[unit];$(id).value=d.toLocaleString('de-DE',{maximumFractionDigits:d>=100?1:3,useGrouping:false});}
+function trkImport(){
+  const txt=$('trkPaste').value,lines=txt.split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
+  const out=[];let prod=null;const exp={};
+  lines.forEach((l,i)=>{
+    const low=l.toLowerCase();
+    if(!prod&&/^gesamt\s*pro\s*stunde/.test(low)){
+      let n=numsIn(l).filter(x=>x>=1000);
+      if(n.length<3){for(let j=i+1;j<lines.length&&n.length<3;j++){n=n.concat(numsIn(lines[j]).filter(x=>x>=1000));}}
+      if(n.length>=3)prod={M:n[0],K:n[1],D:n[2]};
+    }
+    const m=low.match(/^(metall|kristall|deuterium)\b/);
+    if(m){const k={metall:'M',kristall:'K',deuterium:'D'}[m[1]];let n=numsIn(l.slice(m[1].length));
+      for(let j=i+1;j<lines.length&&/^[\d.,\s\t]+$/.test(lines[j]);j++)n=n.concat(numsIn(lines[j]));
+      if(n.length>=2&&!(k in exp))exp[k]=n[n.length-1];}
+  });
+  if(prod){R.forEach(k=>setAmt('p'+k,prod[k]));
+    out.push('<span class="ok">Produktion übernommen</span> pro Stunde: '+R.map(k=>'<span class="t-'+k+'">'+sh(prod[k])+'</span>').join(' · '));}
+  if(R.every(k=>k in exp)){const f=MONTH_H/24;R.forEach(k=>setAmt('e'+k,exp[k]*f));
+    out.push('<span class="ok">Expos übernommen</span> aus Ø pro Tag × '+pkFmt(f)+' Tage: '+R.map(k=>'<span class="t-'+k+'">'+sh(exp[k]*f)+'</span>').join(' · ')+' pro Monat'+(num('eZ')?', plus '+pkFmt(num('eZ'))+' % Zuschlag':''));}
+  if(!out.length){$('trkMsg').textContent='Nichts erkannt. Kopiere die ganze Tabelle mit den Zeilen „gesamt pro Stunde“ oder „Metall / Kristall / Deuterium“.';$('trkOut').hidden=true;return;}
+  $('trkMsg').textContent='';$('trkOut').innerHTML=out.join('<br>')+(prod?'<br><span class="hint" style="margin:0">Der Tracker rechnet mit 100 % Produktionsfaktor ohne Energiemangel.</span>':'');$('trkOut').hidden=false;
+  $('trkPaste').value='';$('exampleNote').hidden=true;calc();save();
+}
+$('trkBtn').addEventListener('click',trkImport);
+$('trkPaste').addEventListener('paste',()=>setTimeout(trkImport,0));
 function setUnit(v){unit=v;document.querySelectorAll('#unitSeg button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.v===v));$('unitHint').textContent=UNITHINT[v];}
 document.querySelectorAll('#unitSeg button').forEach(b=>b.addEventListener('click',()=>{setUnit(b.dataset.v);calc();save();}));
 function setCmp(v){cmp=v;document.querySelectorAll('#cmpSeg button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.v===v));}
