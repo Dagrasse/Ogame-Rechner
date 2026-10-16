@@ -210,10 +210,16 @@ img{max-width:100%}
         </div>
         <div class="res3" style="margin-top:8px">
           <div class="field"><label for="tF">DM pro Händler</label><input id="tF" type="text" inputmode="decimal" value="3.500"></div>
-          <div class="field"><label for="tN">Aufrufe</label><input id="tN" type="text" inputmode="decimal" value="1"></div>
           <div class="field"><label for="tL">Kursverlust %</label><input id="tL" type="text" inputmode="decimal" value="0"></div>
         </div>
         <p class="hint">Der Händler kostet pro Aufruf DM. Sein Kurs schwankt: Kursverlust = wie viel schlechter als der Kurs oben du rechnen willst, z.&nbsp;B. 10.</p>
+        <h2 style="margin-top:12px">Speicher <small>Planet, auf dem du tauschst</small></h2>
+        <div class="res3">
+          <div class="field"><label class="lbl-M" for="kM">Metall</label><input id="kM" type="text" inputmode="decimal" value="" placeholder="leer = egal"></div>
+          <div class="field"><label class="lbl-K" for="kK">Kristall</label><input id="kK" type="text" inputmode="decimal" value="" placeholder="leer = egal"></div>
+          <div class="field"><label class="lbl-D" for="kD">Deuterium</label><input id="kD" type="text" inputmode="decimal" value="" placeholder="leer = egal"></div>
+        </div>
+        <p class="hint">Was du beim Händler bekommst, passt nur bis zur Speichergrösse rein. Daraus rechnet der Rechner, wie oft du den Händler rufen musst. Annahme: Du leerst den Speicher vor jedem Aufruf.</p>
       </div>
       <p class="example" id="exampleNote">Das sind Beispielwerte. Trag deine eigenen ein, sie werden in diesem Browser gespeichert.</p>
       <button class="reset" id="resetBtn" type="button">Auf Beispielwerte zurücksetzen</button>
@@ -255,6 +261,7 @@ img{max-width:100%}
           <tbody id="saveBody"></tbody>
         </table></div>
         <label class="check"><input type="checkbox" id="usePkg" checked> Pakete, die ich habe, einrechnen</label>
+        <div class="plans" id="saveGrid" style="grid-template-columns:repeat(auto-fit,minmax(240px,1fr))"></div>
         <div class="note" id="saveNote"></div>
       </div>
 
@@ -343,7 +350,7 @@ const $=id=>document.getElementById(id);
 const sel=$('rs');
 RESEARCH.forEach(r=>{const o=document.createElement('option');o.value=r[0];o.textContent=r[1];sel.appendChild(o);});
 
-const AMT=/^[pesx][MKD]$/,UNIT={mrd:1e9,mio:1e6,k:1e3,exact:1};let unit='mio';
+const AMT=/^[pesxk][MKD]$/,UNIT={mrd:1e9,mio:1e6,k:1e3,exact:1};let unit='mio';
 function num(id){
   let s=String($(id).value||'').trim().toLowerCase().replace(/[\s'’]/g,'');
   if(!s) return 0;
@@ -445,13 +452,15 @@ function calc(){
   $('balHead').textContent='Bilanz nach '+pkFmt(daysW)+' Tagen';
   $('balBody').innerHTML=R.map(k=>'<tr><td class="name t-'+k+'">'+NAME[k]+'</td><td>'+sh(S[k])+'</td><td>'+sh(inc[k]*wait)+'</td><td>'+sh(own[k])+'</td><td>'+sh(c[k])+
     '</td><td class="'+(bal[k]>=0?'pos':'neg')+'"><strong>'+(bal[k]>=0?'+':'−')+sh(Math.abs(bal[k]))+'</strong></td></tr>').join('');
-  function trades(b){
+  const cap={};R.forEach(k=>cap[k]=num('k'+k));
+  function callsOf(list){return list.reduce((s,t)=>s+Math.max(1,...Object.keys(t.get).map(k=>cap[k]>0?Math.ceil(t.get[k]/cap[k]-1e-9):1)),0);}
+  function trades(b,L=Lt){
     const def=R.filter(k=>b[k]<0),sur=R.filter(k=>b[k]>0).sort((x,y)=>b[y]*W[y]-b[x]*W[x]);
-    let needV=def.reduce((s,k)=>s-b[k]*W[k],0)/(1-Lt);const rem={};def.forEach(k=>rem[k]=-b[k]);const list=[];
-    for(const g of sur){if(needV<=1)break;const giveV=Math.min(b[g]*W[g],needV);needV-=giveV;let recV=giveV*(1-Lt);const get={};
+    let needV=def.reduce((s,k)=>s-b[k]*W[k],0)/(1-L);const rem={};def.forEach(k=>rem[k]=-b[k]);const list=[];
+    for(const g of sur){if(needV<=1)break;const giveV=Math.min(b[g]*W[g],needV);needV-=giveV;let recV=giveV*(1-L);const get={};
       for(const k of def){if(recV<=0)break;const v=Math.min(rem[k]*W[k],recV);if(v>0){get[k]=v/W[k];rem[k]-=v/W[k];recV-=v;}}
       list.push({g,give:giveV/W[g],get});}
-    return {need:def.length>0,ok:needV<=1,list,missV:Math.max(0,needV)*(1-Lt)};
+    return {need:def.length>0,ok:needV<=1,list,missV:Math.max(0,needV)*(1-L)};
   }
   function okAt(h,withPkg){const b={};R.forEach(k=>b[k]=S[k]+inc[k]*h+(withPkg?own[k]:0)-c[k]);
     let need=0,av=0;R.forEach(k=>{if(b[k]<0)need-=b[k]*W[k];else av+=b[k]*W[k];});return need<=av*(1-Lt)+1;}
@@ -464,7 +473,7 @@ function calc(){
     const left={};R.forEach(k=>left[k]=Math.max(0,bal[k]));tr.list.forEach(t=>left[t.g]-=t.give);
     tp='<div class="plan'+(tr.ok?' win-plan':'')+'" style="grid-column:1/-1"><div class="lbl">'+(tr.ok?'Beim Händler tauschen':'Auch mit Händler reicht es noch nicht')+'</div><div class="trade">'+
       tr.list.map(t=>'<div>Gib <strong class="t-'+t.g+'">'+sh(t.give)+' '+NAME[t.g]+'</strong> → bekommst '+Object.keys(t.get).map(k=>'<strong class="t-'+k+'">'+sh(t.get[k])+' '+NAME[k]+'</strong>').join(' + ')+'</div>').join('')+
-      '</div><p>'+(tr.ok?tr.list.length+'× Händler = '+full(tr.list.length*feeT)+' DM · Kurs '+rt.M+':'+rt.K+':'+rt.D+(Lt?' minus '+pkFmt(Lt*100)+' %':'')+
+      '</div><p>'+(tr.ok?callsOf(tr.list)+'× Händler = '+full(callsOf(tr.list)*feeT)+' DM'+(R.some(k=>cap[k]>0)?' (Speicher: max. '+R.filter(k=>cap[k]>0).map(k=>'<span class="t-'+k+'">'+sh(cap[k])+'</span>').join(' · ')+' pro Aufruf)':'')+' · Kurs '+rt.M+':'+rt.K+':'+rt.D+(Lt?' minus '+pkFmt(Lt*100)+' %':'')+
         ' · danach übrig: '+R.map(k=>'<span class="t-'+k+'">'+sh(left[k])+'</span>').join(' · ')
         :'Nach dem Tausch fehlen noch Rohstoffe im Wert von '+sh(tr.missV)+' Metall.')+'</p></div>';
   }
@@ -486,14 +495,14 @@ function calc(){
   // Plan B: nur bestes Paket kaufen, Rest über Händler tauschen (Überschüsse zählen mit)
   const restV=R.reduce((s,k)=>s+(c[k]-S[k]-inc[k]*wait-C[k]*pv[k]-cA*pa[k])*W[k],0);
   const dRest={};R.forEach(k=>dRest[k]=c[k]-S[k]-inc[k]*wait-C[k]*pv[k]-cA*pa[k]);
-  const fee=num('tF'),calls=Math.max(1,Math.round(num('tN'))||1),loss0=Math.min(95,num('tL'))/100;
+  const fee=num('tF'),loss0=Math.min(95,num('tL'))/100;
   function planB(L){
-    if(!best||restV<=0) return {n:0,dm:best?0:Infinity,trade:false};
+    if(!best) return {n:0,dm:Infinity,trade:false};
     let n=Math.max(0,Math.ceil(restV/best.val));
     for(let i=0;i<200000;i++,n++){
       let need=0,avail=0;R.forEach(k=>{const x=n*best.cont[k]-dRest[k];if(x<0)need-=x*W[k];else avail+=x*W[k];});
       if(need<=0) return {n,dm:n*best.dm,trade:false};
-      if(avail*(1-L)>=need) return {n,dm:n*best.dm+calls*fee,trade:true};
+      if(avail*(1-L)>=need){const b={};R.forEach(k=>b[k]=n*best.cont[k]-dRest[k]);const cl=callsOf(trades(b,L).list);return {n,dm:n*best.dm+cl*fee,trade:true,calls:cl};}
     }
     return {n:Infinity,dm:Infinity,trade:true};
   }
@@ -508,13 +517,31 @@ function calc(){
     plans='<div class="plan'+(aWin?' win-plan':'')+'"><div class="lbl">Passend kaufen, nicht tauschen</div><div class="v">'+(isFinite(dmA)?full(dmA)+' DM':'–')+'</div><p>'+
       R.filter(k=>BUY[k]).map(k=>BUY[k]+'× '+NAME[k]).join(', ')+(isFinite(dmA)?'':' · Preis fehlt')+'</p></div>'+
       '<div class="plan'+(!aWin?' win-plan':'')+'"><div class="lbl">Nur '+(best?best.name:'bestes Paket')+' + Händler</div><div class="v">'+(isFinite(dmB)?full(dmB)+' DM':'–')+'</div><p>'+
-      (best?(isFinite(nB)?nB+'× '+best.name:'nicht möglich')+(pB.trade?' + '+calls+'× Händler ('+full(calls*fee)+' DM), Kurs '+rt.M+':'+rt.K+':'+rt.D+(loss0?' minus '+pkFmt(loss0*100)+' %':''):', kein Tausch nötig'):'Preise fehlen')+'</p></div>';
+      (best?(isFinite(nB)?nB+'× '+best.name:'nicht möglich')+(pB.trade?' + '+pB.calls+'× Händler ('+full(pB.calls*fee)+' DM), Kurs '+rt.M+':'+rt.K+':'+rt.D+(loss0?' minus '+pkFmt(loss0*100)+' %':''):', kein Tausch nötig'):'Preise fehlen')+'</p></div>';
     if(isFinite(dmA)&&isFinite(dmB)&&dmA!==dmB){const d=Math.abs(dmA-dmB);plans+='<div class="plan"><div class="lbl">Ersparnis</div><div class="v">'+full(d)+' DM</div><p>'+(aWin?'Direkt kaufen ist günstiger, Tauschen lohnt sich hier nicht.':'Mit dem Händler sparst du '+Math.round(d/Math.max(dmA,1)*100)+' %.')+'</p></div>';}
   }
   if(breakEven!==null&&tot){plans+='<div class="plan"><div class="lbl">Wann lohnt der Händler?</div><div class="v">'+(breakEven<0?'nie':breakEven>=90?'fast immer':'bis '+breakEven+' %')+'</div><p>'+
     (breakEven<0?'Selbst zum vollen Kurs ist direkt kaufen günstiger.':'Tauschen bleibt günstiger, solange der Händler höchstens '+breakEven+' % schlechter ist als '+rt.M+':'+rt.K+':'+rt.D+'.')+'</p></div>';}
   $('dmPlans').innerHTML=plans;
   $('dmHint').textContent='Der Wert eines Pakets hängt von deiner Produktion ab, weil es Stunden deiner Produktion bringt. Kristall und Deut sind über den Händlerkurs in Metall umgerechnet. Beim Tauschen sind die DM für den Händler und dein Kursverlust eingerechnet.';
+  // Spardauer: 4 Varianten
+  function noTradeH(withPkg){return Math.max(0,...R.map(k=>{const m=Math.max(0,c[k]-S[k]-(withPkg?own[k]:0));return m?(inc[k]>0?m/inc[k]:Infinity):0;}));}
+  function cell(h,withPkg,trade,best){
+    let extra='';
+    if(trade&&isFinite(h)){const b={};R.forEach(k=>b[k]=S[k]+inc[k]*h+(withPkg?own[k]:0)-c[k]);const t=trades(b);
+      const n=t.need?callsOf(t.list):0;
+      extra=n?t.list.map(x=>'Gib '+sh(x.give)+' '+NAME[x.g]+' → '+Object.keys(x.get).map(k=>sh(x.get[k])+' '+NAME[k]).join(' + ')).join('<br>')+'<br>'+n+'× Händler = '+full(n*feeT)+' DM':'Kein Tausch nötig';}
+    else if(!trade&&isFinite(h)&&h>0){const bk=R.reduce((a,k)=>{const m=Math.max(0,c[k]-S[k]-(withPkg?own[k]:0));const x=m?(inc[k]>0?m/inc[k]:Infinity):0;return x>a[1]?[k,x]:a;},[null,0]);
+      extra='Engpass: '+NAME[bk[0]];}
+    return '<div class="plan'+(best?' win-plan':'')+'"><div class="lbl">'+(trade?'Mit Händler':'Ohne Händler')+' · '+(withPkg?'mit Paketen':'ohne Pakete')+'</div><div class="v">'+
+      (h===0?'Sofort':dur(h))+'</div><p>'+(isFinite(h)&&h>0?'ca. '+when(h)+'<br>':'')+extra+'</p></div>';
+  }
+  if(tot){
+    const v=[[noTradeH(true),true,false],[minH(true),true,true],[noTradeH(false),false,false],[minH(false),false,true]];
+    const mn=Math.min(...v.map(x=>x[0]));
+    $('saveGrid').innerHTML=v.map(x=>cell(x[0],x[1],x[2],x[0]===mn)).join('');
+  } else $('saveGrid').innerHTML='';
+  $('saveNote').innerHTML='<p>Davon kommt pro Stunde aus Expos: '+expoShare+'.</p>';
 }
 
 // Speichern
