@@ -128,7 +128,7 @@ img{max-width:100%}
     <section class="panel">
       <div class="unitbar">
         <span class="lbl">Rohstoffe eingeben in</span>
-        <div class="seg" id="unitSeg"><button type="button" data-v="mio" aria-pressed="true">Millionen</button><button type="button" data-v="k" aria-pressed="false">Tausend</button><button type="button" data-v="exact" aria-pressed="false">Genau</button></div>
+        <div class="seg" id="unitSeg"><button type="button" data-v="mrd" aria-pressed="false">Milliarden</button><button type="button" data-v="mio" aria-pressed="true">Millionen</button><button type="button" data-v="k" aria-pressed="false">Tausend</button><button type="button" data-v="exact" aria-pressed="false">Genau</button></div>
       </div>
       <p class="hint" id="unitHint" style="margin:0 0 12px"></p>
       <h2>Produktion <small>pro Stunde, alle Planeten</small></h2>
@@ -311,7 +311,7 @@ const $=id=>document.getElementById(id);
 const sel=$('rs');
 RESEARCH.forEach(r=>{const o=document.createElement('option');o.value=r[0];o.textContent=r[1];sel.appendChild(o);});
 
-const AMT=/^[pesx][MKD]$/,UNIT={mio:1e6,k:1e3,exact:1};let unit='mio';
+const AMT=/^[pesx][MKD]$/,UNIT={mrd:1e9,mio:1e6,k:1e3,exact:1};let unit='mio';
 function num(id){
   let s=String($(id).value||'').trim().toLowerCase().replace(/[\s'’]/g,'');
   if(!s) return 0;
@@ -323,7 +323,7 @@ function num(id){
 }
 const full=n=>Math.round(n).toLocaleString('de-DE');
 function sh(n){const a=Math.abs(n),f=(x,d)=>x.toLocaleString('de-DE',{maximumFractionDigits:d});
-  if(a>=1e9) return f(n/1e9,2)+' Mrd'; if(a>=1e6||(unit==='mio'&&a>=1e4)) return f(n/1e6,a>=1e6?2:3)+' Mio'; if(a>=1e4) return f(n/1e3,1)+'k'; return full(n);}
+  if(a>=1e9||(unit==='mrd'&&a>=1e7)) return f(n/1e9,a>=1e9?2:3)+' Mrd'; if(a>=1e6||(unit==='mio'&&a>=1e4)) return f(n/1e6,a>=1e6?2:3)+' Mio'; if(a>=1e4) return f(n/1e3,1)+'k'; return full(n);}
 function dur(h){
   if(!isFinite(h)) return '∞'; if(h<=0) return 'sofort';
   const m=Math.ceil(h*60),d=Math.floor(m/1440),hh=Math.floor(m%1440/60),mm=m%60,p=[];
@@ -468,7 +468,7 @@ function load(){try{let o=JSON.parse(localStorage.getItem(KEY)||'null');
 
 function setTab(t){curTab=t;['save','boost','pkg'].forEach(x=>{$('tab-'+x).setAttribute('aria-selected',x===t);$('p-'+x).hidden=x!==t;});}
 ['save','boost','pkg'].forEach(x=>$('tab-'+x).addEventListener('click',()=>{setTab(x);save();}));
-const UNITHINT={mio:'Zahlen ohne Endung zählen als Millionen, z. B. 1,2 = 1.200.000.',k:'Zahlen ohne Endung zählen als Tausend, z. B. 450 = 450.000.',exact:'Zahlen werden genau so genommen, z. B. 1.200.000.'};
+const UNITHINT={mrd:'Zahlen ohne Endung zählen als Milliarden, z. B. 1,5 = 1.500.000.000.',mio:'Zahlen ohne Endung zählen als Millionen, z. B. 1,2 = 1.200.000.',k:'Zahlen ohne Endung zählen als Tausend, z. B. 450 = 450.000.',exact:'Zahlen werden genau so genommen, z. B. 1.200.000.'};
 function setUnit(v){unit=v;document.querySelectorAll('#unitSeg button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.v===v));$('unitHint').textContent=UNITHINT[v];}
 document.querySelectorAll('#unitSeg button').forEach(b=>b.addEventListener('click',()=>{setUnit(b.dataset.v);calc();save();}));
 function setCmp(v){cmp=v;document.querySelectorAll('#cmpSeg button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.v===v));}
