@@ -112,6 +112,9 @@ textarea:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 .trkout{margin-top:10px;font-size:.85rem;display:flex;flex-direction:column;gap:4px}
 .trkout .ok{color:var(--good);font-weight:600}
 .expoShare{display:flex;flex-wrap:wrap;gap:4px 14px;margin-top:6px;font-size:.82rem}
+.pos{color:var(--good)}.neg{color:var(--warn)}
+.trade{display:flex;flex-direction:column;gap:6px;margin-top:6px;font-size:.92rem}
+.trade div{font-family:var(--f-mono);font-size:.88rem}
 .reset{font:500 .78rem var(--f-body);background:none;border:0;color:var(--muted);text-decoration:underline;cursor:pointer;padding:0}
 </style>
 
@@ -283,7 +286,15 @@ img{max-width:100%}
           <div class="field" style="flex:0 1 200px"><label for="waitD">Vorher noch sparen (Tage)</label><input id="waitD" type="text" inputmode="decimal" value="0"></div>
           <p class="hint" style="flex:1 1 220px;margin:0">Bei 0 rechnet es nur mit deinem Vorrat. Mit z.&nbsp;B. 7 kommen Produktion und Expos von einer Woche dazu. Halbe Tage wie 1,5 gehen auch.</p>
         </div>
-        <div class="headline" style="margin-top:14px">
+        <h3 style="margin-top:16px" id="balHead">Bilanz</h3>
+        <div class="tblwrap"><table>
+          <thead><tr><th>Rohstoff</th><th>Vorrat</th><th>+ Sparen</th><th>+ Deine Pakete</th><th>− Kosten</th><th>Rest</th></tr></thead>
+          <tbody id="balBody"></tbody>
+        </table></div>
+        <div class="plans" id="tradePlan"></div>
+        <div class="note" id="balNote"></div>
+        <h3>Pakete</h3>
+        <div class="headline" style="margin-top:6px">
           <div><div class="lbl">Pakete nötig</div><div class="big" id="pkgBig">–</div></div>
           <div class="meta" id="pkgMeta"></div>
         </div>
@@ -426,7 +437,40 @@ function calc(){
   $('pkgNote').innerHTML=(cA>0?'<p>Deine '+full(cA)+' Komplettpakete sind schon abgezogen, die Tabelle zeigt nur noch Einzelpakete.</p>':'')+
     (tot?'<p><strong>Nur mit Komplettpaketen:</strong> '+(isFinite(allNeed)?allNeed+' nötig, du hast '+full(cA)+(allBuy?', fehlen <strong>'+allBuy+'</strong>':', reicht')+'.':'nicht möglich, Paketwert ist 0.')+'</p>':'')+
     '<p>Aufgerundet auf ganze Pakete. Nach '+dur(wait)+' Sparen hast du zusätzlich '+R.map(k=>'<span class="t-'+k+'">'+sh(inc[k]*wait)+'</span>').join(' · ')+'.</p>'+
-    '<p>Ohne Pakete dauert es '+dur(Math.max(...R.map(k=>{const m=Math.max(0,c[k]-S[k]);return m?(inc[k]>0?m/inc[k]:Infinity):0;})))+'.</p>';
+    '<p>Ohne Pakete und ohne Händler dauert es '+dur(Math.max(...R.map(k=>{const m=Math.max(0,c[k]-S[k]);return m?(inc[k]>0?m/inc[k]:Infinity):0;})))+'.</p>';
+
+  // Bilanz nach X Tagen + Händler
+  const Lt=Math.min(95,num('tL'))/100,feeT=num('tF'),daysW=num('waitD');
+  const own={},bal={};R.forEach(k=>{own[k]=C[k]*pv[k]+cA*pa[k];bal[k]=S[k]+inc[k]*wait+own[k]-c[k];});
+  $('balHead').textContent='Bilanz nach '+pkFmt(daysW)+' Tagen';
+  $('balBody').innerHTML=R.map(k=>'<tr><td class="name t-'+k+'">'+NAME[k]+'</td><td>'+sh(S[k])+'</td><td>'+sh(inc[k]*wait)+'</td><td>'+sh(own[k])+'</td><td>'+sh(c[k])+
+    '</td><td class="'+(bal[k]>=0?'pos':'neg')+'"><strong>'+(bal[k]>=0?'+':'−')+sh(Math.abs(bal[k]))+'</strong></td></tr>').join('');
+  function trades(b){
+    const def=R.filter(k=>b[k]<0),sur=R.filter(k=>b[k]>0).sort((x,y)=>b[y]*W[y]-b[x]*W[x]);
+    let needV=def.reduce((s,k)=>s-b[k]*W[k],0)/(1-Lt);const rem={};def.forEach(k=>rem[k]=-b[k]);const list=[];
+    for(const g of sur){if(needV<=1)break;const giveV=Math.min(b[g]*W[g],needV);needV-=giveV;let recV=giveV*(1-Lt);const get={};
+      for(const k of def){if(recV<=0)break;const v=Math.min(rem[k]*W[k],recV);if(v>0){get[k]=v/W[k];rem[k]-=v/W[k];recV-=v;}}
+      list.push({g,give:giveV/W[g],get});}
+    return {need:def.length>0,ok:needV<=1,list,missV:Math.max(0,needV)*(1-Lt)};
+  }
+  function okAt(h,withPkg){const b={};R.forEach(k=>b[k]=S[k]+inc[k]*h+(withPkg?own[k]:0)-c[k]);
+    let need=0,av=0;R.forEach(k=>{if(b[k]<0)need-=b[k]*W[k];else av+=b[k]*W[k];});return need<=av*(1-Lt)+1;}
+  function minH(withPkg){if(okAt(0,withPkg))return 0;let lo=0,hi=24;while(!okAt(hi,withPkg)){hi*=2;if(hi>24*365*200)return Infinity;}
+    for(let i=0;i<50;i++){const m=(lo+hi)/2;if(okAt(m,withPkg))hi=m;else lo=m;}return hi;}
+  const tr=trades(bal);let tp='';
+  if(!tot){tp='';}
+  else if(!tr.need){tp='<div class="plan win-plan"><div class="lbl">Händler</div><div class="v">Kein Tausch nötig</div><p>Alle drei Rohstoffe reichen nach '+pkFmt(daysW)+' Tagen.</p></div>';}
+  else{
+    const left={};R.forEach(k=>left[k]=Math.max(0,bal[k]));tr.list.forEach(t=>left[t.g]-=t.give);
+    tp='<div class="plan'+(tr.ok?' win-plan':'')+'" style="grid-column:1/-1"><div class="lbl">'+(tr.ok?'Beim Händler tauschen':'Auch mit Händler reicht es noch nicht')+'</div><div class="trade">'+
+      tr.list.map(t=>'<div>Gib <strong class="t-'+t.g+'">'+sh(t.give)+' '+NAME[t.g]+'</strong> → bekommst '+Object.keys(t.get).map(k=>'<strong class="t-'+k+'">'+sh(t.get[k])+' '+NAME[k]+'</strong>').join(' + ')+'</div>').join('')+
+      '</div><p>'+(tr.ok?tr.list.length+'× Händler = '+full(tr.list.length*feeT)+' DM · Kurs '+rt.M+':'+rt.K+':'+rt.D+(Lt?' minus '+pkFmt(Lt*100)+' %':'')+
+        ' · danach übrig: '+R.map(k=>'<span class="t-'+k+'">'+sh(left[k])+'</span>').join(' · ')
+        :'Nach dem Tausch fehlen noch Rohstoffe im Wert von '+sh(tr.missV)+' Metall.')+'</p></div>';
+  }
+  $('tradePlan').innerHTML=tp;
+  const hP=minH(true),h0=minH(false);
+  $('balNote').innerHTML=tot?'<p><strong>Mit Händler reicht es</strong> mit deinen Paketen nach '+dur(hP)+(isFinite(hP)&&hP>0?' ('+when(hP)+')':'')+', ohne Pakete nach '+dur(h0)+(isFinite(h0)&&h0>0?' ('+when(h0)+')':'')+'.</p>':'';
 
   // Dunkle Materie
   const price={M:num('dM'),K:num('dK'),D:num('dD'),A:num('dA')};
