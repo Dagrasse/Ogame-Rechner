@@ -280,8 +280,8 @@ img{max-width:100%}
       <!-- Tab 3 -->
       <div class="tabpanel" id="p-pkg" role="tabpanel" hidden>
         <div class="row" style="gap:12px">
-          <div class="field" style="flex:0 1 200px"><label for="waitH">Vorher noch sparen (Stunden)</label><input id="waitH" type="text" inputmode="decimal" value="0"></div>
-          <p class="hint" style="flex:1 1 220px;margin:0">Bei 0 rechnet es nur mit deinem Vorrat. Mit z.&nbsp;B. 24 kommen Produktion und Expos von einem Tag dazu.</p>
+          <div class="field" style="flex:0 1 200px"><label for="waitD">Vorher noch sparen (Tage)</label><input id="waitD" type="text" inputmode="decimal" value="0"></div>
+          <p class="hint" style="flex:1 1 220px;margin:0">Bei 0 rechnet es nur mit deinem Vorrat. Mit z.&nbsp;B. 7 kommen Produktion und Expos von einer Woche dazu. Halbe Tage wie 1,5 gehen auch.</p>
         </div>
         <div class="headline" style="margin-top:14px">
           <div><div class="lbl">Pakete nötig</div><div class="big" id="pkgBig">–</div></div>
@@ -413,7 +413,7 @@ function calc(){
     (cmp==='metal'?'. Kristall und Deut sind über den Händlerkurs in Metall umgerechnet.':'')+'</p>':'');
 
   // Tab 3
-  const wait=num('waitH');let totNeed=0,totBuy=0;
+  const wait=num('waitD')*24;let totNeed=0,totBuy=0;
   const miss0={};R.forEach(k=>miss0[k]=Math.max(0,c[k]-S[k]-inc[k]*wait));
   const allNeed=Math.max(0,...R.map(k=>miss0[k]>0?(pa[k]>0?Math.ceil(miss0[k]/pa[k]):Infinity):0)),allBuy=Math.max(0,allNeed-cA);
   const BUY={};
